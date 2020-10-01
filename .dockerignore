@@ -1,0 +1,5 @@
+.git
+.github
+.storybook
+dist
+dashboard/node_modules
