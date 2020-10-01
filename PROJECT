@@ -1,0 +1,14 @@
+domain: kloops.io
+multigroup: true
+repo: github.com/kloops-io/kloops
+resources:
+- group: config
+  kind: RepoConfig
+  version: v1alpha1
+- group: config
+  kind: PluginConfig
+  version: v1alpha1
+- group: build
+  kind: Job
+  version: v1alpha1
+version: "2"
