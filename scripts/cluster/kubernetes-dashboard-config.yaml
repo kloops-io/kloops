@@ -1,0 +1,10 @@
+metricsScraper:
+  enabled: true
+
+ingress:
+  enabled: true
+  hosts:
+    - k8s-dashboard.127.0.0.1.nip.io
+
+extraArgs:
+  - --enable-insecure-login

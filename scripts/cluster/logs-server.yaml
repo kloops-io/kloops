@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-server
+  labels: 
+    app: logs-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logs-server
+  template:
+    metadata:
+      labels:
+        app: logs-server
+    spec:
+      containers:
+        - name: node
+          image: node:latest
+          ports:
+            - containerPort: 3000
+          command:
+            - bash
+          args:
+            - -c
+            - |
+              cat <<EOF > server.js
+              const express = require('express');
+              const aws = require('aws-sdk');
+
+              aws.config.update({
+                endpoint: 'minio.tools.svc.cluster.local:9000',
+                accessKeyId: 'ACCESSKEY',
+                secretAccessKey: 'SECRETKEY',
+                region: 'tekton',
+                s3ForcePathStyle: true,
+                sslEnabled: false
+              });
+
+              const s3 = new aws.S3();
+              const app = express();
+
+              const bucket = 'tekton-logs'
+
+              function streamLogs(namespace, pod, container, response) {
+                s3.listObjects({ Bucket: bucket, Delimiter: '', Prefix: namespace+'/'+pod+'/'+container+'/' })
+                  .promise()
+                  .then(files =>
+                    files.Contents.sort((a, b) => a.Key.localeCompare(b.Key)).reduce((acc, file) =>
+                      acc.then(() =>
+                        new Promise(fulfill =>
+                          s3.getObject({Bucket: bucket, Key: file.Key})
+                            .createReadStream()
+                            .on("finish", fulfill)
+                            .pipe(response, { end: false })
+                        )
+                      ),
+                      Promise.resolve()
+                    )
+                  )
+                  .then(() => response.end());
+              }
+              app.get('/logs/:namespace/:pod/:container', (req, res) => streamLogs(req.params.namespace, req.params.pod, req.params.container, res));
+              app.listen(3000, '0.0.0.0');
+              EOF
+
+              npm install aws-sdk express
+
+              node ./server.js
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: logs-server
+  labels:
+    app: logs-server
+spec:
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: logs-server
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: tekton-logs
+spec:
+  rules:
+    - host: logs.127.0.0.1.nip.io
+      http:
+        paths:
+          - backend:
+              serviceName: logs-server
+              servicePort: 3000

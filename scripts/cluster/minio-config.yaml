@@ -1,0 +1,17 @@
+nameOverride: minio
+fullnameOverride: minio
+
+accessKey: ACCESS_KEY
+secretKey: SECRET_KEY
+
+persistence:
+  enabled: false
+
+ingress:
+  enabled: true
+  hosts:
+    - minio.127.0.0.1.nip.io
+
+resources:
+  requests:
+    memory: 100M

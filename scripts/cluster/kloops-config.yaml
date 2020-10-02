@@ -1,0 +1,14 @@
+chatbot:
+  image:
+    pullPolicy: Always
+  ingress:
+    enabled: true      
+    hosts:
+      - kloops-hooks.127.0.0.1.nip.io
+dashboard:
+  image:
+    pullPolicy: Always
+  ingress:
+    enabled: true      
+    hosts:
+      - kloops-dashboard.127.0.0.1.nip.io

@@ -1,0 +1,53 @@
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: Logging
+metadata:
+  name: logging
+spec:
+  fluentd: {}
+  fluentbit:
+    bufferStorageVolume:
+      hostPath:
+        path: /tmp/fluent-bit/buffers
+        type: DirectoryOrCreate
+    positiondb:
+      hostPath:
+        path: /tmp/fluent-bit/tail-db
+        type: DirectoryOrCreate
+    tolerations:
+      - effect: NoSchedule
+        operator: Exists
+  controlNamespace: tools
+---
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterOutput
+metadata:
+  name: s3
+spec:
+  s3:
+    aws_key_id:
+      value: ACCESS_KEY
+    aws_sec_key:
+      value: SECRET_KEY
+    s3_endpoint: http://minio.tools.svc.cluster.local:9000
+    s3_bucket: tekton-logs
+    s3_region: tekton
+    force_path_style: 'true'
+    store_as: text
+    path: ${$.kubernetes.namespace_name}/${$.kubernetes.pod_name}/${$.kubernetes.container_name}/
+    s3_object_key_format: '%{path}%{time_slice}_%{index}.log'
+    buffer:
+      tags: time,$.kubernetes.namespace_name,$.kubernetes.pod_name,$.kubernetes.container_name
+      timekey: 1m
+      timekey_wait: 1m
+      timekey_use_utc: true
+    format:
+      type: single_value
+      message_key: message
+---
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterFlow
+metadata:
+  name: flow
+spec:
+  globalOutputRefs:
+    - s3

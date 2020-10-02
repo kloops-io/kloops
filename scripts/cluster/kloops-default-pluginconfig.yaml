@@ -1,0 +1,13 @@
+apiVersion: config.kloops.io/v1alpha1
+kind: PluginConfig
+metadata:
+  name: default
+spec:
+  # cat:
+  #   key:
+  #     value: put your key here
+  # goose:
+  #   key:
+  #     value: put your key here
+  welcome:
+    messageTemplate: Welcome @{{.PullRequest.Author.Login}}! It looks like this is your first PR to {{.Repo.FullName}} 🎉
