@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-logr/logr"
 	build_v1alpha1 "github.com/kloops-io/kloops/apis/build/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -53,81 +54,18 @@ func (r *JobReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		// on deleted requests.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
-	if job.Spec.Resource.Raw != nil {
+	if job.Spec.Resource != nil {
 		codec := serializer.NewCodecFactory(r.scheme)
 		decoder := codec.UniversalDecoder(r.scheme.PrioritizedVersionsAllGroups()...)
 		obj, _ := runtime.Decode(decoder, job.Spec.Resource.Raw)
-		if result, err := ctrl.CreateOrUpdate(ctx, r.client, obj, func() error { return nil }); err != nil {
+		if err := ctrl.SetControllerReference(&job, obj.(metav1.Object), r.scheme); err != nil {
+			logger.Error(err, "failed to set owner reference")
+			return ctrl.Result{}, err
+		}
+		if _, err := ctrl.CreateOrUpdate(ctx, r.client, obj, func() error { return nil }); err != nil {
 			logger.Error(err, "failed to create or update resource")
-		} else {
-			logger.Info(string(result))
 		}
 	}
-
-	// // filter on job agent
-	// if job.Spec.Agent != configjob.TektonPipelineAgent {
-	// 	return ctrl.Result{}, nil
-	// }
-
-	// // get job's pipeline runs
-	// var pipelineRunList pipelinev1beta1.PipelineRunList
-	// if err := r.client.List(ctx, &pipelineRunList, client.InNamespace(req.Namespace), client.MatchingFields{jobOwnerKey: req.Name}); err != nil {
-	// 	r.logger.Errorf("Failed list pipeline runs: %s", err)
-	// 	return ctrl.Result{}, err
-	// }
-
-	// // if pipeline run does not exist, create it
-	// if len(pipelineRunList.Items) == 0 {
-	// 	if job.Status.State == lighthousev1alpha1.TriggeredState {
-	// 		// construct a pipeline run
-	// 		pipelineRun, err := makePipelineRun(ctx, job, r.namespace, r.logger, r.idGenerator, r.apiReader)
-	// 		if err != nil {
-	// 			r.logger.Errorf("Failed to make pipeline run: %s", err)
-	// 			return ctrl.Result{}, err
-	// 		}
-	// 		// link it to the current lighthouse job
-	// 		if err := ctrl.SetControllerReference(&job, pipelineRun, r.scheme); err != nil {
-	// 			r.logger.Errorf("Failed to set owner reference: %s", err)
-	// 			return ctrl.Result{}, err
-	// 		}
-	// 		// TODO: changing the status should be a consequence of a pipeline run being created
-	// 		// update status
-	// 		job.Status = lighthousev1alpha1.LighthouseJobStatus{
-	// 			State:     lighthousev1alpha1.PendingState,
-	// 			StartTime: metav1.Now(),
-	// 		}
-	// 		if err := r.client.Status().Update(ctx, &job); err != nil {
-	// 			r.logger.Errorf("Failed to update LighthouseJob status: %s", err)
-	// 			return ctrl.Result{}, err
-	// 		}
-	// 		// create pipeline run
-	// 		if err := r.client.Create(ctx, pipelineRun); err != nil {
-	// 			r.logger.Errorf("Failed to create pipeline run: %s", err)
-	// 			return ctrl.Result{}, err
-	// 		}
-	// 	}
-	// } else if len(pipelineRunList.Items) == 1 {
-	// 	// if pipeline run exists, create it and update status
-	// 	pipelineRun := pipelineRunList.Items[0]
-	// 	r.logger.Infof("Reconcile PipelineRun %+v", pipelineRun)
-	// 	// update build id
-	// 	job.Labels[util.BuildNumLabel] = pipelineRun.Labels[util.BuildNumLabel]
-	// 	if err := r.client.Update(ctx, &job); err != nil {
-	// 		r.logger.Errorf("failed to update Project status: %s", err)
-	// 		return ctrl.Result{}, err
-	// 	}
-	// 	if r.dashboardURL != "" {
-	// 		job.Status.ReportURL = fmt.Sprintf("%s/#/namespaces/%s/pipelineruns/%s", trimDashboardURL(r.dashboardURL), r.namespace, pipelineRun.Name)
-	// 	}
-	// 	job.Status.Activity = ConvertPipelineRun(&pipelineRun)
-	// 	if err := r.client.Status().Update(ctx, &job); err != nil {
-	// 		r.logger.Errorf("Failed to update LighthouseJob status: %s", err)
-	// 		return ctrl.Result{}, err
-	// 	}
-	// } else {
-	// 	r.logger.Errorf("A lighthouse job should never have more than 1 pipeline run")
-	// }
 
 	return ctrl.Result{}, nil
 }

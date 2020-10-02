@@ -99,7 +99,7 @@ type JobSpec struct {
 	// Refs is the code under test, determined at runtime
 	Refs *Refs `json:"refs,omitempty"`
 
-	Resource runtime.RawExtension `json:"resource,omitempty"`
+	Resource *runtime.RawExtension `json:"resource,omitempty"`
 }
 
 // JobStatus defines the observed state of Job
@@ -115,6 +115,7 @@ type JobStatus struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // Job is the Schema for the jobs API
 type Job struct {
