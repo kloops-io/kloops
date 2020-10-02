@@ -11,4 +11,7 @@ resources:
 - group: build
   kind: Job
   version: v1alpha1
+- group: tekton
+  kind: Job
+  version: v1alpha1
 version: "2"

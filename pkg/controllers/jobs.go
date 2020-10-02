@@ -5,9 +5,9 @@ import (
 
 	"github.com/go-logr/logr"
 	build_v1alpha1 "github.com/kloops-io/kloops/apis/build/v1alpha1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/json"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -55,17 +55,22 @@ func (r *JobReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	if job.Spec.Resource != nil {
-		codec := serializer.NewCodecFactory(r.scheme)
-		decoder := codec.UniversalDecoder(r.scheme.PrioritizedVersionsAllGroups()...)
-		obj, _ := runtime.Decode(decoder, job.Spec.Resource.Raw)
-		if err := ctrl.SetControllerReference(&job, obj.(metav1.Object), r.scheme); err != nil {
+		var obj unstructured.Unstructured
+		err := json.Unmarshal(job.Spec.Resource.Raw, &obj)
+		// codec := serializer.NewCodecFactory(r.scheme)
+		// decoder := codec.UniversalDecoder(r.scheme.PrioritizedVersionsAllGroups()...)
+		// obj, err := runtime.Decode(decoder, job.Spec.Resource.Raw)
+		obj.SetNamespace(job.Namespace)
+		if err != nil {
+			logger.Error(err, "failed to decode resource")
+		}
+		if err := ctrl.SetControllerReference(&job, &obj, r.scheme); err != nil {
 			logger.Error(err, "failed to set owner reference")
 			return ctrl.Result{}, err
 		}
-		if _, err := ctrl.CreateOrUpdate(ctx, r.client, obj, func() error { return nil }); err != nil {
+		if _, err := ctrl.CreateOrUpdate(ctx, r.client, &obj, func() error { return nil }); err != nil {
 			logger.Error(err, "failed to create or update resource")
 		}
 	}
-
 	return ctrl.Result{}, nil
 }
